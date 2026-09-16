@@ -6,6 +6,9 @@ export const PAGE_MESSAGES = {
   publishReady: '发布后会同步写入 localStorage 和 IndexedDB',
   exchangeEmpty: '还没有交换请求，先去首页挑一件合眼缘的物品',
   profileUpdated: '个人资料已更新',
+  reviewSubmitted: '评价已生效，对方信用分已更新',
+  reviewDone: '本次交换你已评价过对方',
+  reviewWaiting: '等待对方评价',
 };
 
 export const FORM_MESSAGES = {
@@ -14,6 +17,10 @@ export const FORM_MESSAGES = {
   requiredPhone: '请填写联系方式',
   imageLimit: '最多上传 4 张图片',
   exchangeNeedOwnItem: '请先发布一件可交换物品',
+  reviewRatingRange: '评分必须是 1 到 5 的整数星',
+  reviewNotParticipant: '只有本次交换的参与者才能评价',
+  reviewNotCompleted: '交换完成后才能评价',
+  reviewAlreadyExists: '你已评价过本次交换，不能重复评价',
 };
 
 export const LOG_MESSAGES = {

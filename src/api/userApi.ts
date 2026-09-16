@@ -9,7 +9,7 @@ const seedUsers: User[] = [
     avatar: '',
     phone: '13800000001',
     location: '上海 · 徐汇',
-    credit_score: 92,
+    credit_score: 100,
     created_at: new Date().toISOString(),
   },
   {
@@ -18,7 +18,7 @@ const seedUsers: User[] = [
     avatar: '',
     phone: '13800000002',
     location: '杭州 · 西湖',
-    credit_score: 86,
+    credit_score: 100,
     created_at: new Date().toISOString(),
   },
   {
@@ -27,7 +27,7 @@ const seedUsers: User[] = [
     avatar: '',
     phone: '13800000003',
     location: '苏州 · 工业园',
-    credit_score: 78,
+    credit_score: 80,
     created_at: new Date().toISOString(),
   },
 ];

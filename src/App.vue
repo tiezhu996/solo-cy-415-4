@@ -34,17 +34,24 @@ import GlobalErrorBoundary from '@/components/common/GlobalErrorBoundary';
 import { useAuthStore } from '@/stores/authStore';
 import { useExchangeStore } from '@/stores/exchangeStore';
 import { useItemStore } from '@/stores/itemStore';
+import { useReviewStore } from '@/stores/reviewStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { toVantTheme } from '@/utils/themeUtils';
 
 const authStore = useAuthStore();
 const itemStore = useItemStore();
 const exchangeStore = useExchangeStore();
+const reviewStore = useReviewStore();
 const themeStore = useThemeStore();
 const vantTheme = computed(() => toVantTheme(themeStore.theme));
 
 onMounted(async () => {
   themeStore.hydrate();
-  await Promise.all([authStore.hydrate(), itemStore.hydrate(), exchangeStore.hydrate()]);
+  await Promise.all([
+    authStore.hydrate(),
+    itemStore.hydrate(),
+    exchangeStore.hydrate(),
+    reviewStore.hydrate(),
+  ]);
 });
 </script>

@@ -6,12 +6,14 @@ import { LOG_MESSAGES } from '@/constants/messages';
 import { useAuthStore } from '@/stores/authStore';
 import { useExchangeStore } from '@/stores/exchangeStore';
 import { useItemStore } from '@/stores/itemStore';
+import { useReviewStore } from '@/stores/reviewStore';
 
 export const setupRouterGuards = (router: Router) => {
   router.beforeEach(async () => {
     const authStore = useAuthStore();
     const itemStore = useItemStore();
     const exchangeStore = useExchangeStore();
+    const reviewStore = useReviewStore();
     if (!authStore.currentUser) {
       await authStore.hydrate();
     }
@@ -21,6 +23,7 @@ export const setupRouterGuards = (router: Router) => {
     if (!exchangeStore.exchanges.length) {
       await exchangeStore.hydrate();
     }
+    await reviewStore.hydrate();
 
     const statusProbe = itemStore.items.some((item) => item.status === ItemStatus.AVAILABLE);
     const exchangeProbe = exchangeStore.exchanges.some((item) => item.status === ExchangeStatus.PENDING);

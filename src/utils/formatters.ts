@@ -42,6 +42,13 @@ export const formatCreditLevel = (score: number) => {
   return '需谨慎';
 };
 
+export const formatStars = (rating: number) => {
+  const full = Math.round(rating);
+  return `${'★'.repeat(full)}${'☆'.repeat(5 - full)}`;
+};
+
+export const formatRatingText = (rating: number) => `${rating.toFixed(1)} 星（满分 5 星）`;
+
 export const statusToneClass = (status: ItemStatus | ExchangeStatus) => {
   if (status === ItemStatus.AVAILABLE || status === ExchangeStatus.ACCEPTED) return 'status-good';
   if (status === ItemStatus.OFFLINE || status === ExchangeStatus.REJECTED) return 'status-muted';

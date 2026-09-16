@@ -17,6 +17,7 @@
       </div>
     </div>
     <p>{{ exchange.message || formatStatusMessage(exchange.status) }}</p>
+    <ExchangeReviewPanel :exchange="exchange" />
     <footer>
       <span v-if="fromUser && toUser">{{ fromUser.nickname }} → {{ toUser.nickname }}</span>
       <div v-if="canOperate" class="exchange-card__actions">
@@ -41,6 +42,7 @@ import { ExchangeStatus } from '@/constants/exchange';
 import type { Exchange } from '@/models/exchange';
 import type { Item } from '@/models/item';
 import type { User } from '@/models/user';
+import ExchangeReviewPanel from '@/components/common/ExchangeReviewPanel.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { formatDate, formatExchangeStatus, formatStatusMessage, statusToneClass } from '@/utils/formatters';
 

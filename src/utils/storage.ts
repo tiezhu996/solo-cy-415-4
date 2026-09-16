@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   users: prefixed('users'),
   items: prefixed('items'),
   exchanges: prefixed('exchanges'),
+  reviews: prefixed('reviews'),
   theme: prefixed('theme'),
   lastClean: prefixed('last-clean'),
 };
@@ -44,6 +45,66 @@ const parseLocal = <T>(key: string): PersistedEnvelope<T> | null => {
 
 const writeLocal = <T>(key: string, payload: T, ttl?: number) => {
   localStorage.setItem(key, JSON.stringify(envelope(payload, ttl)));
+};
+
+/**
+ * 评价提交需要跨 reviews / users 两个 key 原子落库。
+ * localStorage 与 IndexedDB 都没有多键事务，这里用进程内互斥队列串行化
+ * 所有事务写，配合“先快照、失败整体回滚”，保证评价记录与信用分
+ * 要么同时生效、要么都不留下；并发/重复提交排队后靠唯一约束只生效一次。
+ */
+let transactionChain: Promise<unknown> = Promise.resolve();
+
+export const runInTransaction = async <T>(
+  task: (reader: {
+    get: <V>(key: string, fallback: V) => Promise<V>;
+    set: <V>(key: string, payload: V, ttl?: number) => void;
+  }) => Promise<T>,
+): Promise<T> => {
+  const run = async () => {
+    const pending = new Map<string, { payload: unknown; ttl?: number }>();
+    const reader = {
+      get: async <V>(key: string, fallback: V): Promise<V> => {
+        if (pending.has(key)) return pending.get(key)?.payload as V;
+        return storage.get<V>(key, fallback);
+      },
+      set: <V>(key: string, payload: V, ttl?: number) => {
+        // 预先序列化：复制失败直接中止，不会写出半截数据
+        pending.set(key, { payload: toPlain(payload), ttl });
+      },
+    };
+
+    const result = await task(reader);
+
+    const snapshots = await Promise.all(
+      [...pending.keys()].map(async (key) => ({ key, snapshot: await get<PersistedEnvelope<unknown>>(key) })),
+    );
+    try {
+      for (const [key, { payload, ttl }] of pending) {
+        // eslint-disable-next-line no-await-in-loop
+        await storage.set(key, payload, ttl);
+      }
+    } catch (error) {
+      // 任一键写入失败：已写入的键全部还原，没写入的删除，回到事务前状态
+      await Promise.all(
+        snapshots.map(async ({ key, snapshot }) => {
+          if (snapshot) await set(key, snapshot);
+          else await del(key);
+          localStorage.removeItem(key);
+          if (snapshot) localStorage.setItem(key, JSON.stringify(snapshot));
+        }),
+      );
+      throw error;
+    }
+    return result;
+  };
+
+  const result = transactionChain.then(run, run);
+  transactionChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 };
 
 export const storage = {

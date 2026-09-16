@@ -39,6 +39,8 @@
           <span>发布 {{ myItems.length }}</span>
           <span>可交换 {{ availableCount }}</span>
           <span>信用 {{ currentUser.credit_score }}</span>
+          <span>收到评价 {{ creditSummary.count }}</span>
+          <span v-if="creditSummary.count">平均 {{ creditSummary.average.toFixed(1) }} 星</span>
         </div>
       </div>
     </div>
@@ -68,9 +70,11 @@ import UserBrief from '@/components/common/UserBrief.vue';
 import { ItemStatus } from '@/constants/item';
 import { useAuth } from '@/hooks/useAuth';
 import { useItemStore } from '@/stores/itemStore';
+import { useReviewStore } from '@/stores/reviewStore';
 
 const { currentUser, users, login, updateProfile } = useAuth();
 const itemStore = useItemStore();
+const reviewStore = useReviewStore();
 const selectedUserId = ref('');
 
 const form = reactive({
@@ -101,6 +105,9 @@ watch(
 
 const myItems = computed(() => (currentUser.value ? itemStore.myItems(currentUser.value.id) : []));
 const availableCount = computed(() => myItems.value.filter((item) => item.status === ItemStatus.AVAILABLE).length);
+const creditSummary = computed(() =>
+  currentUser.value ? reviewStore.creditOf(currentUser.value.id) : { count: 0, average: 0 },
+);
 
 const save = async () => {
   await updateProfile({ ...form });

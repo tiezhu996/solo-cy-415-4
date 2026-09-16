@@ -17,7 +17,9 @@ ReSwap 是一个纯前端以物换物 Web 应用。用户可以本地模拟登�
 - 物品详情、物主资料、选择自己的物品发起交换。
 - 发布物品，支持本地 base64 图片上传、分类和成色选择。
 - 交换管理，区分我发起的和我收到的请求，支持同意、拒绝、完成。
-- 个人中心，编辑资料、上传头像、查看我发布的物品。
+- **交换信用评价**：交换完成后参与双方各有一次评价机会，1-5 星评分生效时对方信用分按其“全部已生效评分”的平均分重算；评价记录与信用分更新在同一事务内提交，任一步失败则两者都不留下。
+- 刷新后评价记录、平均星级与信用分从 localStorage / IndexedDB 回读。
+- 个人中心，编辑资料、上传头像、查看我发布的物品、收到评价数与平均星级。
 - 主题切换、全局错误处理和 Vant 提示。
 
 ## 启动与构建
@@ -49,27 +51,37 @@ pnpm build
 
 ```text
 src/
-├── api/              # userApi.ts, itemApi.ts, exchangeApi.ts：本地数据 API 层
-├── stores/           # authStore.ts, itemStore.ts, exchangeStore.ts, themeStore.ts
-├── models/           # user.ts, item.ts, exchange.ts：独立数据模型
+├── api/              # userApi.ts, itemApi.ts, exchangeApi.ts, reviewApi.ts：本地数据 API 层
+├── stores/           # authStore.ts, itemStore.ts, exchangeStore.ts, reviewStore.ts, themeStore.ts
+├── models/           # user.ts, item.ts, exchange.ts, review.ts：独立数据模型
 ├── types/            # 共享类型补充
-├── components/common/# 共享业务组件和 GlobalErrorBoundary
-├── hooks/            # useAuth.ts, useLocalStorage.ts, useExchangeStats.ts
+├── components/common/# 共享业务组件（含 StarRating、ExchangeReviewPanel）和 GlobalErrorBoundary
+├── hooks/            # useAuth.ts, useLocalStorage.ts, useExchangeStats.ts, useExchangeReview.ts
 ├── pages/            # Home, ItemDetail, Publish, Exchanges, Profile
-├── router/           # index.ts + guards.ts
-├── utils/            # storage.ts, formatters.ts, validators.ts, message.ts, themeUtils.ts
-├── constants/        # item.ts, exchange.ts, themes.ts, messages.ts
+├── router/           # index.ts + guards.ts（guards 水合 reviewStore，刷新即可回读评价）
+├── utils/            # storage.ts（含 runInTransaction 原子事务）, formatters.ts, validators.ts, credit.ts, message.ts, themeUtils.ts
+├── constants/        # item.ts, exchange.ts, review.ts, themes.ts, messages.ts
 ├── App.vue
 ├── main.ts
 └── styles.css
 ```
+
+## 信用评价模块说明
+
+- 入口：交换管理页中**状态为“已完成”**的交换卡片底部展示 `<ExchangeReviewPanel>`（仅参与者可见/可用，越权由 API 层复核拦截）。
+- 评分：`<StarRating>`（Vant `Rate`）选择 1-5 整星，可附选填文字；每个交换参与方**只能生效一条评价**。
+- 信用分规则：`utils/credit.ts` 的 `recalcCreditScore` 按被评价人**全部已生效评分**的平均分换算，1-5 星线性映射到 20-100 分（`平均分 × 20`，四舍五入），每次新评价生效都重新汇总重算。
+- 原子性：`reviewApi.submit` 在 `storage.runInTransaction` 内完成“校验 → 追加评价 → 重算信用分”，reviews 与 users 两个 key 同一批次提交；存储层先快照、失败整体回滚，保证评价记录与分值更新**同时成立或都不留下**。
+- 并发与重复：事务队列把双方同时评价、重复点击串行化，`(exchange_id, reviewer_id)` 唯一约束在事务内复查，重复提交/并发提交只有一次生效，双方互不影响、各评一次。
+- 回读：评价与信用分通过 `storage.ts` 双写 localStorage + IndexedDB，`router/guards.ts` 与 `App.vue` 启动时水合 `reviewStore` / `authStore`，刷新页面后评价列表、星级和信用分依旧可见。
 
 ## 数据持久化说明
 
 - `utils/storage.ts` 统一封装 localStorage 和 IndexedDB。
 - 所有 `api/*Api.ts` 通过 `storage.ts` 读写数据，不在组件里直接写业务数据。
 - 存储层包含序列化、版本号、过期清理、存储 key 管理。
-- 首次启动会写入演示用户、物品和交换请求。
+- `runInTransaction` 提供跨 key 的互斥事务（快照 + 失败回滚），供信用评价的评价记录（`reswap:reviews`）与信用分（`reswap:users`）原子提交使用。
+- 首次启动会写入演示用户、物品、交换请求（含两笔已完成交换）与评价记录。
 
 ## 横切关注点
 
