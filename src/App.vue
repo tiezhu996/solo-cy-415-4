@@ -47,11 +47,8 @@ const vantTheme = computed(() => toVantTheme(themeStore.theme));
 
 onMounted(async () => {
   themeStore.hydrate();
-  await Promise.all([
-    authStore.hydrate(),
-    itemStore.hydrate(),
-    exchangeStore.hydrate(),
-    reviewStore.hydrate(),
-  ]);
+  // 基础实体先就位，再水合评价：评价初始化会原子补齐种子评价并重算信用分
+  await Promise.all([authStore.hydrate(), itemStore.hydrate(), exchangeStore.hydrate()]);
+  await reviewStore.hydrate();
 });
 </script>

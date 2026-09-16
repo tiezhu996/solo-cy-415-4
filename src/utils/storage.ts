@@ -99,6 +99,8 @@ export const runInTransaction = async <T>(
     return result;
   };
 
+  // 无论上一个事务成功还是失败都继续执行本事务；.then 会 adopt run 返回的
+  // Promise，因此 result 会等到本事务真正提交/回滚后才落定，调用方读到的即最终状态
   const result = transactionChain.then(run, run);
   transactionChain = result.then(
     () => undefined,

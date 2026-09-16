@@ -1,55 +1,113 @@
+import { itemApi } from '@/api/itemApi';
+import { exchangeApi } from '@/api/exchangeApi';
+import { userApi } from '@/api/userApi';
 import { ExchangeStatus } from '@/constants/exchange';
 import { FORM_MESSAGES } from '@/constants/messages';
 import type { ExchangeReview, ReviewDraft } from '@/models/review';
 import { recalcCreditScore } from '@/utils/credit';
+import { planReviewSeeds, type SeedReviewSpec } from '@/utils/reviewSeed';
 import { runInTransaction, STORAGE_KEYS, storage } from '@/utils/storage';
 
 import type { Exchange } from '@/models/exchange';
+import type { Item } from '@/models/item';
 import type { User } from '@/models/user';
 
 /**
- * 种子评价与 seedExchanges 中的两笔已完成交换一一对应：
+ * 演示评价候选，与 exchangeApi/itemApi 中固定的两笔已完成交换及其物品归属对应：
  * - exchange_done_1：仅林小雨评价了青禾（5 星），留给当前用户“青禾”去评价
  * - exchange_done_2：双向评价，演示双方各评一次
- * 信用分由这些评分平均分推导：青禾收到 [5] → 100、林小雨收到 [5] → 100、
- * 陈木木收到 [4] → 80，与 userApi 种子信用分保持一致。
  */
-const seedReviews: ExchangeReview[] = [
+const SEED_REVIEW_SPECS: SeedReviewSpec[] = [
   {
-    id: 'review_seed_1',
     exchange_id: 'exchange_done_1',
     reviewer_id: 'user_lin',
     reviewee_id: 'user_me',
     rating: 5,
     content: '交换很准时，耳机成色和描述一致。',
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 88).toISOString(),
+    ageMs: 1000 * 60 * 60 * 88,
   },
   {
-    id: 'review_seed_2',
     exchange_id: 'exchange_done_2',
     reviewer_id: 'user_chen',
     reviewee_id: 'user_lin',
     rating: 5,
     content: '小夜灯包装得很仔细。',
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 118).toISOString(),
+    ageMs: 1000 * 60 * 60 * 118,
   },
   {
-    id: 'review_seed_3',
     exchange_id: 'exchange_done_2',
     reviewer_id: 'user_lin',
     reviewee_id: 'user_chen',
     rating: 4,
     content: '龟背竹状态很好，沟通也顺畅。',
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 116).toISOString(),
+    ageMs: 1000 * 60 * 60 * 116,
   },
 ];
 
+/** 演示评价使用可复现的稳定 id，避免重试时因随机 id 造成重复 */
+const seedReviewId = (spec: SeedReviewSpec) =>
+  `review_seed_${spec.exchange_id}_${spec.reviewer_id}`;
+
 export const reviewApi = {
+  /**
+   * 读取评价，并幂等补齐演示评价。
+   *
+   * 初始化策略（避免污染已有数据）：
+   * 1. 先确保 exchanges/users/items 三类基础数据就位（已有数据则原样返回）；
+   * 2. 在 runInTransaction 互斥事务内用 planReviewSeeds 逐条校验候选，
+   *    只有“已完成交换 + 双方参与者账户 + 双方物品归属关系”都齐全才补齐；
+   * 3. 评价写入与受影响被评价人的信用分重算同一批次提交，
+   *    任一步失败则评价和分值都不变；
+   * 4. 自然键 (exchange_id, reviewer_id) 已存在的候选跳过，
+   *    重试 / 部分演示交换缺失时只处理仍匹配的部分，不重复补评价、不重复改分；
+   * 5. 没有任何待补候选时不执行写入，原交换、物品、账户资料与已有评价保持不变。
+   */
   async list(): Promise<ExchangeReview[]> {
-    const reviews = await storage.get<ExchangeReview[]>(STORAGE_KEYS.reviews, []);
-    if (reviews.length) return reviews;
-    await storage.set(STORAGE_KEYS.reviews, seedReviews);
-    return seedReviews;
+    // 基础实体按各自既有规则“无则播种、有则原样返回”，不改变已有数据
+    const [, , existing] = await Promise.all([userApi.list(), itemApi.list(), exchangeApi.list()]);
+
+    return runInTransaction(async (tx) => {
+      const exchanges = await tx.get<Exchange[]>(STORAGE_KEYS.exchanges, existing);
+      const users = await tx.get<User[]>(STORAGE_KEYS.users, []);
+      const items = await tx.get<Item[]>(STORAGE_KEYS.items, []);
+      const reviews = await tx.get<ExchangeReview[]>(STORAGE_KEYS.reviews, []);
+
+      const plan = planReviewSeeds(
+        { exchanges, users, items, reviews, specs: SEED_REVIEW_SPECS },
+        Date.now(),
+      );
+
+      if (!plan.hasChanges) return reviews;
+
+      const inserted: ExchangeReview[] = plan.toInsert.map(({ spec, created_at }) => ({
+        id: seedReviewId(spec),
+        exchange_id: spec.exchange_id,
+        reviewer_id: spec.reviewer_id,
+        reviewee_id: spec.reviewee_id,
+        rating: spec.rating,
+        content: spec.content,
+        created_at,
+      }));
+
+      // 与提交评价保持一致：新评价在前、同时间戳用 id 兜底排序
+      const nextReviews = [...inserted, ...reviews].sort((a, b) => {
+        const time = b.created_at.localeCompare(a.created_at);
+        return time !== 0 ? time : a.id.localeCompare(b.id);
+      });
+
+      // 仅改本次补了评价的被评价人，其余用户资料（含信用分）保持不变
+      const nextUsers = users.map((user) =>
+        Object.prototype.hasOwnProperty.call(plan.scoreUpdates, user.id)
+          ? { ...user, credit_score: plan.scoreUpdates[user.id] }
+          : user,
+      );
+
+      // 同一批次原子落库，任一 key 写入失败由 storage 层整体回滚
+      tx.set(STORAGE_KEYS.reviews, nextReviews);
+      tx.set(STORAGE_KEYS.users, nextUsers);
+
+      return nextReviews;
+    });
   },
 
   byExchange(exchangeId: string): Promise<ExchangeReview[]> {

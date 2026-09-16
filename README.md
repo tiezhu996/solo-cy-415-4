@@ -59,7 +59,7 @@ src/
 ├── hooks/            # useAuth.ts, useLocalStorage.ts, useExchangeStats.ts, useExchangeReview.ts
 ├── pages/            # Home, ItemDetail, Publish, Exchanges, Profile
 ├── router/           # index.ts + guards.ts（guards 水合 reviewStore，刷新即可回读评价）
-├── utils/            # storage.ts（含 runInTransaction 原子事务）, formatters.ts, validators.ts, credit.ts, message.ts, themeUtils.ts
+├── utils/            # storage.ts（含 runInTransaction 原子事务）, reviewSeed.ts（演示评价初始化规划）, formatters.ts, validators.ts, credit.ts, message.ts, themeUtils.ts
 ├── constants/        # item.ts, exchange.ts, review.ts, themes.ts, messages.ts
 ├── App.vue
 ├── main.ts
@@ -74,6 +74,16 @@ src/
 - 原子性：`reviewApi.submit` 在 `storage.runInTransaction` 内完成“校验 → 追加评价 → 重算信用分”，reviews 与 users 两个 key 同一批次提交；存储层先快照、失败整体回滚，保证评价记录与分值更新**同时成立或都不留下**。
 - 并发与重复：事务队列把双方同时评价、重复点击串行化，`(exchange_id, reviewer_id)` 唯一约束在事务内复查，重复提交/并发提交只有一次生效，双方互不影响、各评一次。
 - 回读：评价与信用分通过 `storage.ts` 双写 localStorage + IndexedDB，`router/guards.ts` 与 `App.vue` 启动时水合 `reviewStore` / `authStore`，刷新页面后评价列表、星级和信用分依旧可见。
+
+### 演示评价初始化（防数据污染）
+
+`reviewApi.list()` 每次读取都会**幂等补齐**演示评价，但严格遵守“不污染已有数据”：
+
+- 先用各实体 API 既有规则引导 users/items/exchanges（已有数据原样返回），再由纯函数 `utils/reviewSeed.ts` 的 `planReviewSeeds` 逐条校验候选。
+- 只有当演示评价对应的**已完成交换、双方参与者账户、双方物品归属关系都齐全**时才补齐；任一关系缺失则跳过该候选，**其他候选照常处理**（只剩部分演示交换时只补仍匹配的部分）。
+- 自然键 `(exchange_id, reviewer_id)` 已存在评价的候选跳过；演示评价使用稳定 id，因此**重试不会重复补评价、不会重复改分**。
+- 本次待补评价与受影响被评价人的信用分在 `runInTransaction` 同一批次写入，**任一步失败则评价与信用分都不变**；不在更新名单内的用户（含未参与者）信用分与账户资料保持不变。
+- 信用分按“已有评价 + 本次补齐评价”的全部已生效评分平均分重算，保证评价数、平均分、信用分三者一致。
 
 ## 数据持久化说明
 

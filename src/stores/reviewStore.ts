@@ -38,6 +38,9 @@ export const useReviewStore = defineStore('reviews', {
       try {
         this.reviews = await reviewApi.list();
         this.loaded = true;
+        // 演示评价初始化会原子重算受影响用户的信用分，刷新用户数据保持口径一致
+        const authStore = useAuthStore();
+        await authStore.hydrate();
       } finally {
         this.loading = false;
       }

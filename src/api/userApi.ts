@@ -1,5 +1,6 @@
 import type { User, UserDraft } from '@/models/user';
 
+import { DEFAULT_CREDIT_SCORE } from '@/constants/review';
 import { storage, STORAGE_KEYS } from '@/utils/storage';
 
 const seedUsers: User[] = [
@@ -9,7 +10,8 @@ const seedUsers: User[] = [
     avatar: '',
     phone: '13800000001',
     location: '上海 · 徐汇',
-    credit_score: 100,
+    // 初始为中性默认分，首次演示评价初始化后按已生效评分平均分推导
+    credit_score: DEFAULT_CREDIT_SCORE,
     created_at: new Date().toISOString(),
   },
   {
@@ -18,7 +20,7 @@ const seedUsers: User[] = [
     avatar: '',
     phone: '13800000002',
     location: '杭州 · 西湖',
-    credit_score: 100,
+    credit_score: DEFAULT_CREDIT_SCORE,
     created_at: new Date().toISOString(),
   },
   {
@@ -27,7 +29,7 @@ const seedUsers: User[] = [
     avatar: '',
     phone: '13800000003',
     location: '苏州 · 工业园',
-    credit_score: 80,
+    credit_score: DEFAULT_CREDIT_SCORE,
     created_at: new Date().toISOString(),
   },
 ];
