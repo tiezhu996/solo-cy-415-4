@@ -1,0 +1,9 @@
+# pnpm 12 构建脚本放行名单（默认禁止依赖执行安装脚本）。
+# 仅放行当前依赖真正需要执行安装脚本的包，其余继续禁用。
+#
+# - esbuild: true —— postinstall 就位平台专属二进制，是 Vite 构建的硬依赖，全新环境必须放行。
+# - vue-demi: false —— postinstall 仅按 Vue 版本切换构建；发布包顶层默认即 Vue 3 构建，
+#   本项目使用 Vue 3，不执行也正确，显式继续禁用。
+allowBuilds:
+  esbuild: true
+  vue-demi: false

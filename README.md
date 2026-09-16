@@ -35,6 +35,20 @@ pnpm build
 
 生产部署：执行 `pnpm build` 后，将 `dist/` 目录交给 Nginx 或任意静态文件服务器托管。
 
+### 全新环境安装（构建脚本白名单）
+
+pnpm 10 及以上默认禁止依赖执行安装脚本，未配置时 `pnpm install` 会在构建脚本放行检查处中止（`ERR_PNPM_IGNORED_BUILDS`）。本项目根目录的 `pnpm-workspace.yaml` 用 `allowBuilds` 显式声明白名单：
+
+- `esbuild: true`：其 postinstall 负责就位平台专属二进制，是 Vite 构建的硬依赖，必须放行；
+- `vue-demi: false`：其 postinstall 仅按 Vue 版本切换构建，发布包顶层默认即 Vue 3 构建，本项目使用 Vue 3，不需要执行，继续禁用。
+
+因此无缓存环境直接执行下面的命令即可退出码 0 完成安装并进入可构建状态，重复安装结果一致：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+```
+
 ## 技术栈
 
 | 类型 | 技术 |
