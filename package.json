@@ -1,0 +1,31 @@
+{
+  "name": "reswap",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 18415",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 18415"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "dayjs": "^1.11.13",
+    "idb-keyval": "^6.2.2",
+    "lodash-es": "^4.17.21",
+    "pinia": "^2.3.1",
+    "vant": "^4.9.19",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/lodash-es": "^4.17.12",
+    "@types/node": "^22.10.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.2.0"
+  }
+}
